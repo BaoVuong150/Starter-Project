@@ -4,24 +4,60 @@
 
 ---
 
-## 🛠️ Công nghệ & Tính năng nổi bật
+## 🛠️ Chi tiết các mô-đun và API hiện có
 
-### 1. Backend (.NET 10.0 & ASP.NET Core)
-* **Kiến trúc Modular Monolith:** Các nghiệp vụ (`Auth`, `Users`) được tách biệt thành các mô-đun riêng biệt, độc lập dữ liệu, sẵn sàng chuyển đổi thành Microservices khi cần.
-* **Hệ cơ sở dữ liệu tối ưu (PostgreSQL 15):**
-  * Sử dụng **Connection Pooling** (`AddDbContextPool`) để tối ưu hiệu năng kết nối gấp 10 lần.
-  * Tự động thử lại khi lỗi mạng chập chờn (`EnableRetryOnFailure` tối đa 35 lần).
-  * Giới hạn thời gian chạy câu lệnh (`CommandTimeout` 30s) chống treo luồng.
-* **Bộ nhớ đệm tự vệ (Redis 7 Cache):** Cấu hình `abortConnect=false` và timeout kết nối 5 giây giúp Web Server hoạt động bình thường kể cả khi Redis gặp sự cố.
-* **Bảo mật & Giới hạn tần suất:** Tích hợp **Global Rate Limiting** toàn cục (Fixed Window, tối đa 100 requests/phút từ cùng một IP) chống spam API và brute-force.
-* **Tài liệu API tự động:** Tích hợp **OpenAPI & Scalar Reference API Docs** tuyệt đẹp tại môi trường Development.
+### 1. Mô-đun Xác thực (Auth Module)
+Mô-đun quản lý toàn bộ luồng đăng ký, đăng nhập và bảo mật phiên hoạt động của người dùng.
+* **Đăng ký tài khoản (`POST /api/auth/register`):**
+  * Đầu vào: `email`, `password`, `firstName`, `lastName`.
+  * Đầu ra: Trả về thông tin cơ bản của tài khoản vừa tạo (User DTO) sau khi đã mã hóa bảo mật mật khẩu.
+* **Đăng nhập (`POST /api/auth/login`):**
+  * Đầu vào: `email`, `password`.
+  * Trả về: Access Token (chuỗi JWT ngắn hạn dùng để gọi API).
+  * **Cơ chế bảo mật:** Tự động tạo và lưu trữ Refresh Token dài hạn vào **HTTPOnly Cookie** (cấu hình `Secure`, `SameSite=None` cho phép truyền chéo tên miền) để bảo vệ tối đa chống tấn công XSS/CSRF.
+* **Làm mới phiên làm việc (`POST /api/auth/refresh`):**
+  * Tự động lấy Refresh Token từ HTTPOnly Cookie (hoặc body yêu cầu) kết hợp Access Token cũ để cấp Access Token mới cùng Refresh Token mới.
+* **Đăng xuất (`POST /api/auth/logout`):**
+  * Yêu cầu xác thực. Thu hồi (Revoke) Refresh Token trong cơ sở dữ liệu và xóa bỏ HTTPOnly Cookie ở phía Client.
 
-### 2. Frontend (React 19, Vite 8 & Tailwind CSS v4)
-* **Kiến trúc Feature-Based:** Tổ chức code tách biệt theo tính năng (như `products`, `auth`) ngăn chặn việc import chéo và giữ code sạch sẽ.
-* **Styling hiện đại:** Sử dụng **Tailwind CSS v4** mới nhất kết hợp với thư viện **Ant Design v6** theo chủ đề **Light Mode Glassmorphism** (sáng mờ kính tông màu Indigo & Slate).
-* **Quản lý trạng thái:** Sử dụng **Zustand v5** quản lý Auth state trong bộ nhớ RAM (bảo mật Access Token) và **TanStack React Query v5** quản lý cache dữ liệu API.
-* **Định tuyến & Lazy Loading:** Sử dụng React Lazy Loading để tải trang bất đồng bộ, cải thiện hiệu năng tải trang đầu tiên.
-* **Hỗ trợ Docker:** Cấu hình file-watch polling giúp Hot Reload hoạt động mượt mà chéo hệ điều hành.
+---
+
+### 2. Mô-đun Người dùng (Users Module)
+Mô-đun quản lý thông tin hồ sơ và thông tin cá nhân của người dùng. Mọi API trong mô-đun này đều yêu cầu xác thực JWT (`[Authorize]`).
+* **Lấy thông tin cá nhân (`GET /api/users/profile`):**
+  * Lấy `userId` từ Token JWT đang đăng nhập để truy vấn thông tin chi tiết: Họ tên, email, ngày sinh, đường dẫn ảnh đại diện (avatarUrl), trạng thái hoạt động (isActive) và ngày tạo tài khoản.
+* **Cập nhật thông tin cá nhân (`PUT /api/users/profile`):**
+  * Cho phép người dùng chỉnh sửa thông tin cá nhân gồm: `firstName`, `lastName`, `avatarUrl`, `dateOfBirth`.
+
+---
+
+### 3. Cấu hình Kỹ thuật & Tự vệ Hệ thống
+
+#### Hệ cơ sở dữ liệu tối ưu (PostgreSQL 15 & EF Core)
+* **Connection Pooling:** Sử dụng `AddDbContextPool` để tái sử dụng kết nối, tăng tốc độ truy vấn gấp 10 lần và tránh quá tải cổng kết nối.
+* **Mạng chập chờn:** Tự động thử lại khi lỗi kết nối mạng tạm thời (`EnableRetryOnFailure` tối đa 3 lần, delay tối đa 5 giây).
+* **Tránh treo luồng:** Thiết lập `CommandTimeout` tối đa 30 giây để tự hủy các câu lệnh nghẽn mạng hoặc kẹt khóa (deadlock).
+
+#### Bộ nhớ đệm tự vệ (Redis 7 Cache)
+* **Khởi động bền bỉ:** Cấu hình `abortConnect=false` cho phép Web Server hoạt động bình thường kể cả khi Redis đang offline lúc khởi động.
+* **Không làm nghẽn luồng:** Giới hạn thời gian kết nối `connectTimeout=5000` (5 giây) để tránh treo Web Server khi Redis phản hồi chậm.
+
+#### Bảo mật Tần suất Yêu cầu (Rate Limiting)
+* **Global Rate Limiting:** Tự động chặn các IP gửi spam request bằng thuật toán **Fixed Window**. Giới hạn tối đa **100 requests/phút** trên mỗi IP (đối chiếu qua kết nối trực tiếp hoặc thông qua proxy `X-Forwarded-For`).
+* Trả về mã lỗi tiêu chuẩn `429 Too Many Requests`.
+
+#### Tài liệu API (Scalar API Docs)
+* Sử dụng chuẩn **OpenAPI** kết hợp giao diện **Scalar** hiện đại để hiển thị tài liệu và chạy thử nghiệm trực tiếp các API Module (chỉ hiển thị ở môi trường Development).
+
+---
+
+### 4. Giao diện Frontend (React 19, Vite 8 & Tailwind CSS v4)
+* **Kiến trúc Feature-Based:** Chia code độc lập theo thư mục tính năng (`features/auth`, `features/products`) tránh liên kết chéo bừa bãi.
+* **Thiết kế:** Light Mode Glassmorphism (sáng mờ kính) sang trọng với màu sắc chủ đạo Indigo & Slate, sử dụng **Tailwind CSS v4** kết hợp **Ant Design v6**.
+* **Đường dẫn có sẵn:**
+  * Trang chủ bán hàng tĩnh: `/`
+  * Trang đăng nhập: `/login` (đã tích hợp nút login giả lập liên kết Zustand Store để kiểm tra đổi trạng thái header).
+  * Trang đăng ký: `/register` (placeholder tĩnh).
 
 ---
 
@@ -47,25 +83,16 @@
 
 ## ⚡ Hướng dẫn Khởi chạy Dự án
 
-### Yêu cầu hệ thống
-* Đã cài đặt **Docker Desktop** và **.NET 10 SDK**.
-
-### Các bước khởi chạy
-
 1. **Khởi động Database & Cache & Frontend:**
    Mở terminal tại thư mục gốc và chạy lệnh:
    ```bash
    docker compose up -d
    ```
-   *Lệnh này sẽ tự động tải các package frontend và khởi chạy Vite Server chạy trên cổng `5173`.*
-
 2. **Chạy Backend:**
-   Mở dự án Backend trên Visual Studio / Rider hoặc chạy lệnh Terminal tại thư mục `backend/Api`:
+   Mở terminal tại thư mục `backend/Api` và chạy:
    ```bash
    dotnet run
    ```
-   *Backend sẽ chạy trên cổng http://localhost:5000 (HTTPS: https://localhost:5001).*
 
-### Đường dẫn truy cập nhanh
 * **Giao diện bán hàng (Storefront):** http://localhost:5173
 * **Tài liệu API (Scalar Docs):** http://localhost:5000/scalar/v1
