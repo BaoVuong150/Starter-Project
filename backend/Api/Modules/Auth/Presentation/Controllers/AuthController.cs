@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace backend.Modules.Auth.Presentation.Controllers;
 
@@ -15,6 +16,7 @@ namespace backend.Modules.Auth.Presentation.Controllers;
 public class AuthController(IAuthService authService, IConfiguration configuration) : ControllerBase
 {
     [HttpPost("register")]
+    [EnableRateLimiting("auth-limit")]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
@@ -24,6 +26,7 @@ public class AuthController(IAuthService authService, IConfiguration configurati
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth-limit")]
     [ProducesResponseType(typeof(TokenDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)

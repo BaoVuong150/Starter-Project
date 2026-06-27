@@ -99,15 +99,23 @@ public static class ServiceExtensions
         return services;
     }
 
-    // 5. Cấu hình Global Rate Limiting
+    // 5. Cấu hình Global Rate Limiting & Specific Policies
     public static IServiceCollection AddRateLimiting(this IServiceCollection services)
     {
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+            // Bộ lọc chung (Global Limiter) - Tự động bỏ qua nếu Endpoint có Rate Limit riêng
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
             {
+                var endpoint = httpContext.GetEndpoint();
+                if (endpoint?.Metadata.GetMetadata<EnableRateLimitingAttribute>() != null)
+                {
+                    // Trả về bộ lọc rỗng để nhường quyền xử lý cho chính sách riêng
+                    return RateLimitPartition.GetNoLimiter<string>("bypass");
+                }
+
                 var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() 
                                 ?? httpContext.Request.Headers["X-Forwarded-For"].ToString() 
                                 ?? "anonymous";
@@ -118,6 +126,24 @@ public static class ServiceExtensions
                     {
                         AutoReplenishment = true,
                         PermitLimit = 100,
+                        QueueLimit = 0,
+                        Window = TimeSpan.FromMinutes(1)
+                    });
+            });
+
+            // Bộ lọc riêng cho Auth (Đăng nhập/Đăng ký) - Giới hạn 5 lần/phút cho mỗi IP
+            options.AddPolicy("auth-limit", httpContext =>
+            {
+                var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() 
+                                ?? httpContext.Request.Headers["X-Forwarded-For"].ToString() 
+                                ?? "anonymous";
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: ipAddress,
+                    factory: partition => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 5,
                         QueueLimit = 0,
                         Window = TimeSpan.FromMinutes(1)
                     });
