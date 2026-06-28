@@ -1,12 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { App } from 'antd';
 import { loginApi, getProfileApi } from '../services/authService';
 import { useAuthStore } from '../store/useAuthStore';
 import type { LoginDto } from '../../../types';
 
 export const useLoginForm = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const setToken = useAuthStore((state) => state.setToken);
   const setUser = useAuthStore((state) => state.setUser);

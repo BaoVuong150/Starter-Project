@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { App } from 'antd';
 import { registerApi } from '../services/authService';
 import type { RegisterDto } from '../../../types';
 
@@ -11,6 +11,7 @@ export interface RegisterFormValues extends RegisterDto {
 }
 
 export const useRegisterForm = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
 
   const {
