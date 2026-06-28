@@ -2,6 +2,7 @@ import { Layout, Input, Badge, Button, Space, Avatar } from 'antd';
 import { ShoppingCartOutlined, SearchOutlined, LoginOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../features/auth/store/useAuthStore';
+import { useLogout } from '../features/auth/hooks/useLogout';
 
 const { Header, Content, Footer } = Layout;
 
@@ -9,12 +10,11 @@ export const StorefrontLayout = () => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const logout = useAuthStore((state) => state.logout);
+  const { handleLogout, isLoading } = useLogout();
 
   const handleAuthAction = () => {
     if (isAuthenticated) {
-      logout();
-      navigate('/');
+      handleLogout();
     } else {
       navigate('/login');
     }
@@ -75,6 +75,7 @@ export const StorefrontLayout = () => {
                 danger
                 icon={<LogoutOutlined />}
                 onClick={handleAuthAction}
+                loading={isLoading}
                 style={{ display: 'flex', alignItems: 'center' }}
               >
                 Đăng xuất
